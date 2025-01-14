@@ -55,6 +55,6 @@ creating a temporary virtual environment, install dependencies into it and run
 the script in the context of that venv.
 
 ```bash
-wget https://github.com/jgaines/zigup.git/src/zigup.py
+wget https://raw.githubusercontent.com/jgaines/zigup/master/src/zigup.py
 uv run zigup.py
 ```
