@@ -1,5 +1,5 @@
 # /// script
-# requires-python = ">=3.13"
+# requires-python = ">=3.6"
 # dependencies = [
 #     "requests",
 # ]
@@ -11,7 +11,7 @@ import platform
 import shutil
 import subprocess
 import tarfile
-# import zipfile
+# import zipfile  # for windows installs
 
 import requests
 
