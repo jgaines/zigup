@@ -1,6 +1,6 @@
 # zigup
 
-Simplistic tool to inject then dev-latest version of zig and zls into the mise
+Simplistic tool to inject the dev-latest version of zig and zls into the mise
 installs directory structure. It uses JSON endpoints in both projects to
 determine the latest daily build and if it's newer than whats currently
 installed, it installs it into the mise/installs/zig folder and sets up a
@@ -55,6 +55,6 @@ creating a temporary virtual environment, install dependencies into it and run
 the script in the context of that venv.
 
 ```bash
-wget https://raw.githubusercontent.com/jgaines/zigup/master/src/zigup.py
+wget https://raw.githubusercontent.com/jgaines/zigup/master/src/zigup/zigup.py
 uv run zigup.py
 ```
