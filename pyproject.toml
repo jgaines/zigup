@@ -1,0 +1,24 @@
+[project]
+name = "zigup"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "John Gaines", email = "me@jgaines.com" }
+]
+requires-python = ">=3.6"  # determined by vermin, actual testing done with 3.13.1
+dependencies = [
+    "requests>=2.32.3",
+]
+
+[project.scripts]
+zigup = "zigup:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "ipython>=8.31.0",
+]
