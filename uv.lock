@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.10"
 
 [[package]]
@@ -298,7 +299,6 @@ wheels = [
 
 [[package]]
 name = "zigup"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "requests" },

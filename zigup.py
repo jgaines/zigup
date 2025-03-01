@@ -4,16 +4,19 @@
 #     "requests",
 # ]
 # ///
-
+import argparse
 import json
 import pathlib
 import platform
 import shutil
 import subprocess
+import sys
 import tarfile
-# import zipfile  # for windows installs
+# import zipfile  # for windows installs, not implemented yet
 
 import requests
+
+__version__ = "0.2.0"
 
 zig_version_json_url = "https://ziglang.org/download/index.json"
 zig_platform_key = platform.machine().lower() + "-" + platform.system().lower()
@@ -24,17 +27,17 @@ zls_version_json_url = "https://releases.zigtools.org/v1/zls/select-version?zig_
 
 def extract_tar_strip_leading_dir(tar_file, extract_dir, mode, strip_components=1):
     """
-    Extracts the contents of a .tar.xz file, stripping the specified number of
+    Extracts the contents of a .tar{.xz,.gz} file, stripping the specified number of
     leading directory components from the extracted file paths.
 
     Args:
-      tar_xz_file: Path to the .tar.xz file.
+      tar_file: Path to the tar file.
       extract_dir: Path to the directory where the files should be extracted.
       strip_components: Number of leading directory components to strip.
                         Defaults to 1.
 
     Raises:
-      FileNotFoundError: If the tar_xz_file is not found.
+      FileNotFoundError: If the tar_file is not found.
       Exception: If any other error occurs during extraction.
     """
     try:
@@ -58,9 +61,31 @@ def extract_tar_strip_leading_dir(tar_file, extract_dir, mode, strip_components=
         print(f"An error occurred during extraction: {e}")
 
 
-def main() -> None:
+def main() -> int:
+    # process command line arguments
+    parser = argparse.ArgumentParser(
+        description="Install or update Zig and ZLS dev-latest into mise/installs/zig",
+        epilog="It's not super smart and has only been tested on Linux so far.",
+    )
+    parser.add_argument("--version", "-V", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument("--verbose", "-v", action="count", default=0, help="Increase verbosity")
+    args = parser.parse_args()
+
+    # Check to make sure mise is installed
+    try:
+        installed = subprocess.run(["mise", "version"], check=True, stdout=subprocess.PIPE).returncode == 0
+    except FileNotFoundError:
+        installed = False
+    if not installed:
+        print("mise is not installed, please install it first.")
+        return 1
+
+    # Verfiy target directory exists
+    target_dir.mkdir(parents=True, exist_ok=True)
+
     zig_version_json = requests.get(zig_version_json_url).json()
-    # print(json.dumps(zig_version_json['master'], indent=4))
+    if args.verbose > 1:
+        print(json.dumps(zig_version_json, indent=4))
     zig_version_master = zig_version_json["master"]["version"]
 
     zig_dev_latest_dir = target_dir / "dev-latest"
@@ -72,11 +97,12 @@ def main() -> None:
         )
     else:
         zig_version_current = subprocess.run(["zig", "version"], stdout=subprocess.PIPE).stdout.decode("UTF-8").strip()
-    print(f"Master Version: {zig_version_master}")
-    print(f"Current Version: {zig_version_current}")
+    print(f"Installed Version: {zig_version_current}")
+    print(f"   Latest Version: {zig_version_master}")
     new_version_available = zig_version_current < zig_version_master
     if new_version_available:
-        print(f"New Version Available?: {zig_version_current < zig_version_master}")
+        if args.verbose > 0:
+            print(f"New Version Available?: {zig_version_current < zig_version_master}")
         zig_file_master = zig_version_json["master"][zig_platform_key]["tarball"]
 
         if zig_file_master.endswith(".tar.xz"):
@@ -95,7 +121,8 @@ def main() -> None:
         else:
             raise Exception(f"Unknown file type: {zig_file_master}")
 
-        print(f"Downloading {zig_file_master}")
+        if args.verbose > 0:
+            print(f"Downloading {zig_file_master}")
         # Download the file
         response = requests.get(zig_file_master, stream=True)
         with zig_file.open("wb") as f:
@@ -109,7 +136,8 @@ def main() -> None:
             # dest_dir.mkdir(parents=True, exist_ok=True)
             extract(zig_file, dest_dir, open_mode)
             # symlink the new version to ~/.local/share/mise/zig/dev-latest
-            print(f"Symlinking {dest_dir} to {zig_dev_latest_dir}")
+            if args.verbose > 0:
+                print(f"Symlinking {dest_dir} to {zig_dev_latest_dir}")
             if zig_dev_latest_dir.exists():
                 old_zig_dir = zig_dev_latest_dir.resolve()
                 zig_dev_latest_dir.unlink()
@@ -124,16 +152,20 @@ def main() -> None:
         except Exception as e:
             print(e)
     else:
-        print("No New Zig Version Available")
+        print("Latest version already installed.")
+        return 0
 
     # ZLS
 
-    print("Checking for ZLS")
+    if args.verbose > 0:
+        print("Checking for ZLS")
     zls_dev_latest = zig_dev_latest_dir / "bin/zls"
     if not zls_dev_latest.exists():
-        print("ZLS not found, retrieving correct version")
+        if args.verbose > 0:
+            print("ZLS not found, retrieving correct version")
         zls_version_json = requests.get(zls_version_json_url.format(zig_version_master.replace("+", "%2B"))).json()
-        # print(json.dumps(zls_version_json, indent=4))
+        if args.verbose > 1:
+            print(json.dumps(zls_version_json, indent=4))
         zls_tar = zls_version_json[zig_platform_key]["tarball"]
         if zls_tar.endswith(".tar.xz"):
             zls_file = pathlib.Path("zls.tar.xz")
@@ -148,7 +180,8 @@ def main() -> None:
         else:
             raise Exception(f"Unknown file type: {zls_file}")
 
-        print(f"Downloading {zls_tar}")
+        if args.verbose > 0:
+            print(f"Downloading {zls_tar}")
         # Download the file
         response = requests.get(zls_tar, stream=True)
         with zls_file.open("wb") as f:
@@ -156,7 +189,8 @@ def main() -> None:
                 f.write(chunk)
 
         zls_dev_latest_dir = zig_dev_latest_dir / "zls"
-        print(f"Extracting {zls_file} to {zls_dev_latest_dir}")
+        if args.verbose > 0:
+            print(f"Extracting {zls_file} to {zls_dev_latest_dir}")
         # Extract the file to ~/.local/share/mise/zig/{zig_version_master}
         try:
             if not zls_dev_latest_dir.exists():
@@ -171,9 +205,12 @@ def main() -> None:
 
     if old_zig_dir:
         # remove the old zig version
-        print(f"Removing old zig version: {old_zig_dir}")
+        if args.verbose > 0:
+            print(f"Removing old zig version: {old_zig_dir}")
         shutil.rmtree(old_zig_dir)
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

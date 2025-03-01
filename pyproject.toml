@@ -1,6 +1,6 @@
 [project]
 name = "zigup"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Add your description here"
 readme = "README.md"
 authors = [
@@ -18,8 +18,8 @@ zigup = "zigup:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/zigup"]
+[tool.hatch.version]
+path = "zigup.py"
 
 [dependency-groups]
 dev = [

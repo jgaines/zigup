@@ -23,7 +23,7 @@ commented out bits in the right places for it.
 
 # Usage
 
-There are no command line options to this at the moment.  It also assumes you've
+There are no command line options to this at the moment.  It assumes you've
 already installed at least one version of zig using mise.  So if you haven't
 already, you must at a minimum run (`install` or `use` both work):
 
@@ -36,6 +36,16 @@ for too long and because it's not complete or very well polished. To use the
 script, you can clone the repo and use pipx or uv install it from the repo, or
 simply download the src/zigup.py script by itself and use `uv run` to execute it
 (it has inline dependencies which uv run can make use of).
+
+## Install from Github
+
+```bash
+uv tool install git+https://github.com/jgaines/zigup
+```
+
+You can substitute `pipx` for `uv tool` above if you prefer that.  Or even pip
+if you're installing into an Python (virtual) environment with the proper
+requirements (which at this point is just requests).
 
 ## Clone and Install
 
@@ -55,6 +65,6 @@ creating a temporary virtual environment, install dependencies into it and run
 the script in the context of that venv.
 
 ```bash
-wget https://raw.githubusercontent.com/jgaines/zigup/master/src/zigup/zigup.py
+wget https://raw.githubusercontent.com/jgaines/zigup/master/zigup.py
 uv run zigup.py
 ```
