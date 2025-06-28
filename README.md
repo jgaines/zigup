@@ -23,9 +23,9 @@ commented out bits in the right places for it.
 
 # Usage
 
-There are no command line options to this at the moment.  It assumes you've
-already installed at least one version of zig using mise.  So if you haven't
-already, you must at a minimum run (`install` or `use` both work):
+It assumes you've already installed at least one version of zig using mise.  So
+if you haven't already, you must at a minimum run (`install` or `use` both
+work):
 
 ```bash
 mise install zig
