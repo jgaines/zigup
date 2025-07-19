@@ -36,9 +36,12 @@ This repository uses Jujutsu (jj) in colocated mode on top of git:
 
 ### Version Management Logic
 ```python
-# Version comparison uses string comparison (works due to Zig's versioning scheme)
-new_version_available = zig_version_current < zig_version_master
+# Uses proper semantic version parsing instead of string comparison
+# Handles Zig's dev build format: 0.15.0-dev.{build_number}+{commit_hash}
+new_version_available = is_newer_version(zig_version_current, zig_version_master)
 ```
+
+**Critical Bug**: The original string comparison failed when dev build numbers had different digit lengths (e.g., `dev.929` vs `dev.1145`). The `parse_zig_version()` and `is_newer_version()` functions now properly handle Zig's versioning scheme.
 
 ### Symlink Strategy
 - Extracts to versioned directory: `~/.local/share/mise/installs/zig/{version}/`

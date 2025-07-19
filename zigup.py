@@ -9,6 +9,7 @@ import argparse
 import json
 import pathlib
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -24,6 +25,60 @@ zig_platform_key = platform.machine().lower() + "-" + platform.system().lower()
 target_dir = pathlib.Path("~/.local/share/mise/installs/zig/").expanduser()
 
 zls_version_json_url = "https://releases.zigtools.org/v1/zls/select-version?zig_version={}&compatibility=only-runtime"
+
+
+def parse_zig_version(version_str):
+    """
+    Parse a Zig version string like '0.15.0-dev.1145+3ae0ba096' into comparable components.
+    Returns a tuple: (major, minor, patch, is_dev, dev_build_num, commit_hash)
+    """
+    # Pattern for Zig version: major.minor.patch[-dev.build_num][+commit_hash]
+    pattern = r'^(\d+)\.(\d+)\.(\d+)(?:-dev\.(\d+))?(?:\+([a-f0-9]+))?$'
+    match = re.match(pattern, version_str)
+    
+    if not match:
+        # Fallback to string comparison for unexpected formats
+        return (0, 0, 0, False, 0, version_str)
+    
+    major, minor, patch, dev_build, commit = match.groups()
+    
+    return (
+        int(major),
+        int(minor), 
+        int(patch),
+        dev_build is not None,  # is_dev
+        int(dev_build) if dev_build else 0,
+        commit or ""
+    )
+
+
+def is_newer_version(current_version, latest_version):
+    """
+    Compare two Zig version strings to determine if latest is newer than current.
+    Handles the Zig versioning scheme properly including dev builds.
+    """
+    current = parse_zig_version(current_version)
+    latest = parse_zig_version(latest_version)
+    
+    # Compare major.minor.patch first
+    if current[:3] != latest[:3]:
+        return current[:3] < latest[:3]
+    
+    # Same base version, check dev status
+    current_is_dev, latest_is_dev = current[3], latest[3]
+    
+    # Release > dev build (e.g., 0.15.0 > 0.15.0-dev.1145)
+    if not current_is_dev and latest_is_dev:
+        return False
+    if current_is_dev and not latest_is_dev:
+        return True
+        
+    # Both are dev builds, compare build numbers
+    if current_is_dev and latest_is_dev:
+        return current[4] < latest[4]
+    
+    # Both are releases with same version - no update needed
+    return False
 
 
 def extract_tar_strip_leading_dir(tar_file, extract_dir, mode, strip_components=1):
@@ -53,7 +108,7 @@ def extract_tar_strip_leading_dir(tar_file, extract_dir, mode, strip_components=
                 # Reconstruct the path with the stripped components
                 member.name = str(pathlib.Path(*stripped_path_components))
 
-                tar.extract(member, path=extract_dir)
+                tar.extract(member, path=extract_dir, filter='data')
             print(f"Successfully extracted {tar_file} to {extract_dir}")
 
     except FileNotFoundError:
@@ -100,10 +155,10 @@ def main() -> int:
         zig_version_current = subprocess.run(["zig", "version"], stdout=subprocess.PIPE).stdout.decode("UTF-8").strip()
     print(f"Installed Version: {zig_version_current}")
     print(f"   Latest Version: {zig_version_master}")
-    new_version_available = zig_version_current < zig_version_master
+    new_version_available = is_newer_version(zig_version_current, zig_version_master)
     if new_version_available:
         if args.verbose > 0:
-            print(f"New Version Available?: {zig_version_current < zig_version_master}")
+            print(f"New Version Available: {new_version_available}")
         zig_file_master = zig_version_json["master"][zig_platform_key]["tarball"]
 
         if zig_file_master.endswith(".tar.xz"):
