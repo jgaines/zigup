@@ -66,6 +66,8 @@ the script in the context of that venv.
 
 ```bash
 wget https://raw.githubusercontent.com/jgaines/zigup/master/zigup.py
+# or use curl instead of wget
+curl -O https://raw.githubusercontent.com/jgaines/zigup/master/zigup.py
 uv run zigup.py
 # or make it executable and run it directly
 chmod +x zigup.py
