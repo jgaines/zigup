@@ -1,6 +1,6 @@
 # zigup
 
-Simplistic tool to inject the dev-latest version of zig and zls into the mise
+Simple tool to inject the dev-latest version of zig and zls into the mise
 installs directory structure. It uses JSON endpoints in both projects to
 determine the latest daily build and if it's newer than what's currently
 installed, it installs it into the mise/installs/zig folder and sets up a
@@ -9,7 +9,7 @@ dev-latest symlink to it.
 Once the dev-latest is installed, you can `mise use zig@dev-latest` to use it
 and the corresponding zls (Zig Language Server).
 
-# Caveats
+## Caveats
 
 I whipped this up in a day to solve the problem of mise being unable to install
 the daily builds of zig and zls.  I did this because I wanted to work through
@@ -18,10 +18,9 @@ build.
 
 I have only tested this on a linux machine.  The code to handle installs on a
 Mac is partially done though untested as I don't have access to a Mac at the
-moment. The code to handle Windows is not written at all, though there are some
-commented out bits in the right places for it.
+moment.
 
-# Usage
+## Usage
 
 It assumes you've already installed at least one version of zig using mise.  So
 if you haven't already, you must run (`install` or `use` both work):
@@ -36,7 +35,7 @@ script, you can clone the repo and use pipx or uv install it from the repo, or
 simply download the src/zigup.py script by itself and use `uv run` to execute it
 (it has inline dependencies which uv run can make use of).
 
-## Install from Github
+### Install from Github
 
 ```bash
 uv tool install git+https://github.com/jgaines/zigup
@@ -46,7 +45,7 @@ You can substitute `pipx` for `uv tool` above if you prefer that.  Or even pip
 if you're installing into an Python (virtual) environment with the proper
 requirements (which at this point is just requests).
 
-## Clone and Install
+### Clone and Install
 
 ```bash
 git clone https://github.com/jgaines/zigup.git
@@ -56,19 +55,33 @@ uv tool install .
 
 You can substitute `pipx` for `uv tool` above if you prefer that.
 
-## Download Script and Run with uv or Directly
+### Download Script and Run with uv or Directly
 
 Now that uv has support for in-script dependencies, you can download the script
-run it directly.  uv will take care of creating a temporary virtual environment,
-install dependencies into it and run the script in the context of that venv.  It
-will cache the venv so that subsequent runs are faster.
+and run it directly.  uv will take care of creating a temporary virtual
+environment, install dependencies into it and run the script in the context of
+that virtual environment.  It will cache the virtual environment so that
+subsequent runs are faster.
 
-```bash
+Use wget or curl to download the script:
+
+```shell
 wget https://raw.githubusercontent.com/jgaines/zigup/master/zigup.py
-# or use curl instead of wget
+```
+
+```shell
 curl -O https://raw.githubusercontent.com/jgaines/zigup/master/zigup.py
+```
+
+Run it with uv:
+
+```shell
 uv run zigup.py
-# or make it executable and run it directly
+```
+
+or make it executable and run it directly:
+
+```shell
 chmod +x zigup.py
 ./zigup.py
 ```

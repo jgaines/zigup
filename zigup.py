@@ -14,7 +14,6 @@ import shutil
 import subprocess
 import sys
 import tarfile
-# import zipfile  # for windows installs, not implemented yet
 
 import requests
 
@@ -169,11 +168,6 @@ def main() -> int:
             zig_file = pathlib.Path("zig.tar.gz")
             extract = extract_tar_strip_leading_dir
             open_mode = "r:gz"
-        # elif zig_file_master.endswith('.zip'):
-        #     zig_file = pathlib.Path('zig.zip')
-        #     # TODO: no clue if we need to strip leading dir here
-        #     opener = zipfile.open
-        #     open_mode = 'r'
         else:
             raise Exception(f"Unknown file type: {zig_file_master}")
 
@@ -231,8 +225,6 @@ def main() -> int:
             zls_file = pathlib.Path("zls.tar.gz")
             extract = extract_tar_strip_leading_dir
             open_mode = "r:gz"
-        # elif zls_tar.endswith('.zip'):
-        #     zls_file = pathlib.Path('zls.zip')
         else:
             raise Exception(f"Unknown file type: {zls_file}")
 
