@@ -4,6 +4,15 @@
 
 `zigup` is a specialized tool that manages daily development builds of the Zig programming language and ZLS (Zig Language Server) within the mise version manager ecosystem. It fills a gap where mise cannot install bleeding-edge daily builds that are required for projects like ziglings.
 
+## Version Control
+
+This repository uses Jujutsu (jj) in colocated mode on top of git:
+- Before making any changes, create a new revset:
+    ```shell
+    jj new
+    jj desc -m "description"  --author "copilot <copilot@jgaines.com>"
+    ```
+
 ## Architecture & Core Components
 
 ### Single-File Design
