@@ -10,3 +10,5 @@ wheels/
 .venv
 .python-version
 mise.toml
+zig.tar.xz
+zls.tar.xz

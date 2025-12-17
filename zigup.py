@@ -34,16 +34,16 @@ def parse_zig_version(version_str):
     # Pattern for Zig version: major.minor.patch[-dev.build_num][+commit_hash]
     pattern = r'^(\d+)\.(\d+)\.(\d+)(?:-dev\.(\d+))?(?:\+([a-f0-9]+))?$'
     match = re.match(pattern, version_str)
-    
+
     if not match:
         # Fallback to string comparison for unexpected formats
         return (0, 0, 0, False, 0, version_str)
-    
+
     major, minor, patch, dev_build, commit = match.groups()
-    
+
     return (
         int(major),
-        int(minor), 
+        int(minor),
         int(patch),
         dev_build is not None,  # is_dev
         int(dev_build) if dev_build else 0,
@@ -58,24 +58,24 @@ def is_newer_version(current_version, latest_version):
     """
     current = parse_zig_version(current_version)
     latest = parse_zig_version(latest_version)
-    
+
     # Compare major.minor.patch first
     if current[:3] != latest[:3]:
         return current[:3] < latest[:3]
-    
+
     # Same base version, check dev status
     current_is_dev, latest_is_dev = current[3], latest[3]
-    
+
     # Release > dev build (e.g., 0.15.0 > 0.15.0-dev.1145)
     if not current_is_dev and latest_is_dev:
         return False
     if current_is_dev and not latest_is_dev:
         return True
-        
+
     # Both are dev builds, compare build numbers
     if current_is_dev and latest_is_dev:
         return current[4] < latest[4]
-    
+
     # Both are releases with same version - no update needed
     return False
 
@@ -146,11 +146,24 @@ def main() -> int:
     zig_dev_latest_dir = target_dir / "dev-latest"
     zig_dev_latest = zig_dev_latest_dir / "bin/zig"
     old_zig_dir = None
-    if zig_dev_latest.exists():
+
+    # Check if dev-latest symlink exists (even if broken) and is valid
+    if zig_dev_latest_dir.is_symlink():
+        # Try to use the symlinked version if the target still exists
+        if zig_dev_latest.exists():
+            zig_version_current = (
+                subprocess.run([zig_dev_latest, "version"], stdout=subprocess.PIPE).stdout.decode("UTF-8").strip()
+            )
+        else:
+            # Symlink is broken, get version from system zig as fallback
+            zig_version_current = subprocess.run(["zig", "version"], stdout=subprocess.PIPE).stdout.decode("UTF-8").strip()
+    elif zig_dev_latest.exists():
+        # dev-latest exists as a regular directory (not a symlink)
         zig_version_current = (
             subprocess.run([zig_dev_latest, "version"], stdout=subprocess.PIPE).stdout.decode("UTF-8").strip()
         )
     else:
+        # No dev-latest at all, use system zig
         zig_version_current = subprocess.run(["zig", "version"], stdout=subprocess.PIPE).stdout.decode("UTF-8").strip()
     print(f"Installed Version: {zig_version_current}")
     print(f"   Latest Version: {zig_version_master}")
@@ -181,21 +194,41 @@ def main() -> int:
 
         print(f"Extracting {zig_file} to {target_dir}")
         # Extract the file to ~/.local/share/mise/zig/{zig_version_master}
+        dest_dir = pathlib.Path(target_dir) / zig_version_master
         try:
-            dest_dir = pathlib.Path(target_dir) / zig_version_master
             # dest_dir.mkdir(parents=True, exist_ok=True)
             extract(zig_file, dest_dir, open_mode)
+
+            # Ensure bin/ directory exists and zig binary is accessible at bin/zig
+            # Some Zig distributions have bin/zig, others have zig at root
+            zig_bin_dir = dest_dir / "bin"
+            zig_binary = dest_dir / "zig"
+            zig_in_bin = zig_bin_dir / "zig"
+
+            if not zig_bin_dir.exists():
+                zig_bin_dir.mkdir(parents=True)
+
+            if zig_binary.exists() and not zig_in_bin.exists():
+                # Move zig binary to bin/ directory for consistency
+                shutil.move(str(zig_binary), str(zig_in_bin))
+
             # symlink the new version to ~/.local/share/mise/zig/dev-latest
             if args.verbose > 0:
                 print(f"Symlinking {dest_dir} to {zig_dev_latest_dir}")
-            if zig_dev_latest_dir.exists():
-                old_zig_dir = zig_dev_latest_dir.resolve()
+            # Remove old symlink/directory, handling both valid and broken symlinks
+            if zig_dev_latest_dir.is_symlink():
+                # Save the old directory path before unlinking (only if target exists)
+                try:
+                    old_zig_dir = zig_dev_latest_dir.resolve(strict=True)
+                except (OSError, RuntimeError):
+                    # Broken symlink or resolution error
+                    pass
                 zig_dev_latest_dir.unlink()
+            elif zig_dev_latest_dir.exists():
+                # It's a regular directory, save and remove it
+                old_zig_dir = zig_dev_latest_dir
+            # Create new symlink
             zig_dev_latest_dir.symlink_to(dest_dir, target_is_directory=True)
-            zig_dev_latest_bin = zig_dev_latest_dir / "bin"
-            if not zig_dev_latest_bin.exists():
-                zig_dev_latest_bin.mkdir(parents=True)
-                zig_dev_latest.symlink_to(dest_dir / "zig")
             zig_file.unlink()
         except FileExistsError:
             print("File already exists")
@@ -205,51 +238,75 @@ def main() -> int:
         print("Latest version already installed.")
         return 0
 
-    # ZLS
+    # ZLS - Always reinstall when updating Zig to ensure compatibility
 
     if args.verbose > 0:
-        print("Checking for ZLS")
+        print("Installing ZLS for Zig {}".format(zig_version_master))
     zls_dev_latest = zig_dev_latest_dir / "bin/zls"
-    if not zls_dev_latest.exists():
-        if args.verbose > 0:
-            print("ZLS not found, retrieving correct version")
-        zls_version_json = requests.get(zls_version_json_url.format(zig_version_master.replace("+", "%2B"))).json()
-        if args.verbose > 1:
-            print(json.dumps(zls_version_json, indent=4))
-        zls_tar = zls_version_json[zig_platform_key]["tarball"]
-        if zls_tar.endswith(".tar.xz"):
-            zls_file = pathlib.Path("zls.tar.xz")
-            extract = extract_tar_strip_leading_dir
-            open_mode = "r:xz"
-        elif zls_tar.endswith(".tar.gz"):
-            zls_file = pathlib.Path("zls.tar.gz")
-            extract = extract_tar_strip_leading_dir
-            open_mode = "r:gz"
+    # Remove old ZLS if it exists
+    if zls_dev_latest.is_symlink():
+        zls_dev_latest.unlink()
+    elif zls_dev_latest.exists():
+        zls_dev_latest.unlink()
+
+    zls_dev_latest_dir = zig_dev_latest_dir / "zls"
+    if zls_dev_latest_dir.exists():
+        shutil.rmtree(zls_dev_latest_dir)
+
+    if args.verbose > 0:
+        print("Retrieving compatible ZLS version")
+    zls_version_json = requests.get(zls_version_json_url.format(zig_version_master.replace("+", "%2B"))).json()
+    if args.verbose > 1:
+        print(json.dumps(zls_version_json, indent=4))
+    zls_tar = zls_version_json[zig_platform_key]["tarball"]
+    if zls_tar.endswith(".tar.xz"):
+        zls_file = pathlib.Path("zls.tar.xz")
+        extract = extract_tar_strip_leading_dir
+        open_mode = "r:xz"
+    elif zls_tar.endswith(".tar.gz"):
+        zls_file = pathlib.Path("zls.tar.gz")
+        extract = extract_tar_strip_leading_dir
+        open_mode = "r:gz"
+    else:
+        raise Exception(f"Unknown file type: {zls_file}")
+
+    if args.verbose > 0:
+        print(f"Downloading {zls_tar}")
+    # Download the file
+    response = requests.get(zls_tar, stream=True)
+    with zls_file.open("wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    if args.verbose > 0:
+        print(f"Extracting {zls_file} to {zls_dev_latest_dir}")
+    # Extract the file to the ZLS subdirectory
+    try:
+        zls_dev_latest_dir.mkdir(parents=True, exist_ok=True)
+        extract(zls_file, zls_dev_latest_dir, open_mode, strip_components=0)
+
+        # Find the ZLS binary and move it to bin/zls
+        zls_binary_in_extract = zls_dev_latest_dir / "zls"
+        if zls_binary_in_extract.exists():
+            # Ensure bin directory exists in the actual installation (not through symlink)
+            actual_bin_dir = dest_dir / "bin"
+            actual_bin_dir.mkdir(parents=True, exist_ok=True)
+
+            # Move ZLS binary to bin directory
+            zls_target = actual_bin_dir / "zls"
+            if zls_target.exists() or zls_target.is_symlink():
+                zls_target.unlink()
+            shutil.move(str(zls_binary_in_extract), str(zls_target))
+            if args.verbose > 0:
+                print(f"Installed ZLS to {zls_target}")
         else:
-            raise Exception(f"Unknown file type: {zls_file}")
+            print(f"Warning: ZLS binary not found in {zls_dev_latest_dir}")
 
-        if args.verbose > 0:
-            print(f"Downloading {zls_tar}")
-        # Download the file
-        response = requests.get(zls_tar, stream=True)
-        with zls_file.open("wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-
-        zls_dev_latest_dir = zig_dev_latest_dir / "zls"
-        if args.verbose > 0:
-            print(f"Extracting {zls_file} to {zls_dev_latest_dir}")
-        # Extract the file to ~/.local/share/mise/zig/{zig_version_master}
-        try:
-            if not zls_dev_latest_dir.exists():
-                zls_dev_latest_dir.mkdir(parents=True)
-            extract(zls_file, zls_dev_latest_dir, open_mode, strip_components=0)
-            zls_dev_latest.symlink_to(zls_dev_latest_dir / "zls")
-            zls_file.unlink()
-        except FileExistsError:
-            print("File already exists")
-        except Exception as e:
-            print(e)
+        zls_file.unlink()
+    except FileExistsError:
+        print("ZLS file already exists")
+    except Exception as e:
+        print(f"Error installing ZLS: {e}")
 
     if old_zig_dir:
         # remove the old zig version
